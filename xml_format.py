@@ -64,6 +64,7 @@ def MessageToDOM(message, imgs_filename):
     CreateXmlMessage(message, doc, document_root)
     olddoc = parseString(doc.toxml())
     olddoc = Convert2oldver(olddoc)
+    doc = Convert2newver(doc)
     return (doc, olddoc)    # doc -> xml v11.x ----- olddoc -> xml v10.x
 
 def CreateXmlMessage(message, doc, element):
@@ -146,6 +147,11 @@ def CreateXmlAttribute(field, value, doc, element):
             field_value = field_value.lower()[14:]
         if field.name == "align_type" or field.name == "text_align" or field.name == "res_align":
             field_value = field_value.lower()
+        if field.name == "ambient_mode":
+            if field_value == "NORMAL_ONLY":
+                field_value = "0"
+            else:
+                field_value = "1"
         element.setAttribute(field.name, field_value)
     elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_STRING:
         if field.name[:8] == "res_name" or field.name in ResAttribute :
@@ -195,9 +201,23 @@ def CreateXmlAttributeMS(prefield, message, doc, element):
             else:
                 prevalue.append("false")
         else:
+            if value > 4294960000:
+                value =  value-1-4294967295   # int最大值是4294967295,所以-5会被解释为4294967295 - 5 + 1
             prevalue.append(str(value))
     element.setAttribute(prefield.name, ",".join(prevalue))
     return
+
+# 转换成 HwWatchFaceDesigner V12 的版本的xml文件
+def Convert2newver(doc):
+    root = doc.documentElement    #HwTheme
+    
+    for child1 in root.childNodes :
+        if child1.nodeName == 'element':
+            for child2 in child1.childNodes :
+                if child2.nodeName == 'layer':
+                    Convert2newver_layer(child2)
+    
+    return doc
 
 # 转换成 HwWatchFaceDesigner V10 的版本的xml文件
 def Convert2oldver(doc):
@@ -252,6 +272,14 @@ def Convert2oldver_layer(layernd):
             layernd.setAttribute("x_offset", "0")
         if not layernd.hasAttribute("y_offset"):
             layernd.setAttribute("y_offset", "0")
+    
+
+# 转换V12过程中，对 layer 节点进行一定的处理
+def Convert2newver_layer(layernd):
+    # 属性值的有条件替换
+    if layernd.getAttribute("draw_type") == "hand_res" and layernd.hasAttribute("res_name"):
+        layernd.setAttribute("res_left", layernd.getAttribute("res_name"))
+        layernd.removeAttribute("res_name")
     
 
 # 转换V10过程中，对 container 节点进行一定的处理
